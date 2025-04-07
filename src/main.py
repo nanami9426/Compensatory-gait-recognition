@@ -26,6 +26,8 @@ def process_frame(frame):
         # 如果监测出两个人及以上，取置信度最大的
         idx = res.boxes.conf.argmax(-1).item()
         kp = res.keypoints.xy[idx].unsqueeze(0)
+    elif len(res.boxes.cls) == 0:
+        kp = None
     return res.plot(), kp
 
 def gen_frames():
@@ -42,8 +44,11 @@ def gen_frames():
             break
         
         frame, kp = process_frame(frame) # kp即关键点，形状[num_people, 17, 2]
+        if kp is None:
+            continue
         ready = window.add(kp)
         if ready:
+            # 做后继模型的预测
             print(window.data.shape)
             window.clear()
         success, frame = cv2.imencode('.jpg', frame)
