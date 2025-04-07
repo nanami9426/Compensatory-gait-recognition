@@ -16,3 +16,8 @@ MJPEG+前端img轮询实现图片在前端显示
 
 2：错误
 
+
+
+#### 启动
+
+uvicorn main:app --host 0.0.0.0 --port 8000

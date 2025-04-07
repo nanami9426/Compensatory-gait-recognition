@@ -10,6 +10,7 @@ from ultralytics.utils import LOGGER
 LOGGER.setLevel(logging.WARNING)
 
 from utils.window import Window
+from utils.reminder import reminder_bytes
 
 app = FastAPI()
 streaming = True
@@ -45,16 +46,18 @@ def gen_frames():
         
         frame, kp = process_frame(frame) # kp即关键点，形状[num_people, 17, 2]
         if kp is None:
-            continue
-        ready = window.add(kp)
-        if ready:
-            # 做后继模型的预测
-            print(window.data.shape)
-            window.clear()
-        success, frame = cv2.imencode('.jpg', frame)
-        if not success:
-            break
-        frame = frame.tobytes()
+            frame = reminder_bytes
+        else:
+            ready = window.add(kp)
+            if ready:
+                # 做后继模型的预测
+                print(window.data.shape)
+                window.clear()
+            success, frame = cv2.imencode('.jpg', frame)
+            if not success:
+                break
+            frame = frame.tobytes()
+
         yield (b"--banana\r\n"
                b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
         
