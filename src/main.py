@@ -2,16 +2,34 @@ from fastapi import FastAPI, Response
 from fastapi.responses import StreamingResponse, JSONResponse
 import cv2
 import threading
+from ultralytics import YOLO
+import torch
+
+import logging
+from ultralytics.utils import LOGGER
+LOGGER.setLevel(logging.WARNING)
+
+from utils.window import Window
 
 app = FastAPI()
 streaming = True
 lock = threading.Lock()
 
+model = YOLO('../models/yolo11n-pose.pt')
+window_size = 24
+
 def process_frame(frame):
     frame = cv2.flip(frame, 1)
-    return frame
+    res = model(frame)[0]
+    kp = res.keypoints.xy
+    if len(res.boxes.cls) > 1:
+        # 如果监测出两个人及以上，取置信度最大的
+        idx = res.boxes.conf.argmax(-1).item()
+        kp = res.keypoints.xy[idx].unsqueeze(0)
+    return res.plot(), kp
 
 def gen_frames():
+    window = Window(torch.device("cuda:0"), window_size, (17, 2))
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     while True:
         with lock:
@@ -23,7 +41,11 @@ def gen_frames():
         if not success:
             break
         
-        frame = process_frame(frame)
+        frame, kp = process_frame(frame) # kp即关键点，形状[num_people, 17, 2]
+        ready = window.add(kp)
+        if ready:
+            print(window.data.shape)
+            window.clear()
         success, frame = cv2.imencode('.jpg', frame)
         if not success:
             break

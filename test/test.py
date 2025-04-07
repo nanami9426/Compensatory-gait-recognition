@@ -1,6 +1,9 @@
 from ultralytics import YOLO
+import logging
+from ultralytics.utils import LOGGER
+LOGGER.setLevel(logging.WARNING)
 
-model = YOLO('yolo11n-pose.pt')
+model = YOLO('../models/yolo11n-pose.pt')
 
 import cv2
 
@@ -12,14 +15,20 @@ while cap.isOpened():
         break
 
     results = model(frame)
-
     annotated_frame = results[0].plot()
-    print(results[0].keypoints.xy.shape)
-
-    cv2.imshow('YOLO11n-pose', annotated_frame)
-
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    s = results[0].keypoints.xy.shape
+    if s[0] > 1:
+        print(results[0].boxes.conf.argmax(-1))
+        idx = results[0].boxes.conf.argmax(-1).item()
+        print(len(results[0].boxes.cls))
+        print(results[0].boxes.conf)
+        print(results[0].keypoints.xy[idx].unsqueeze(0).shape)
         break
+
+    # cv2.imshow('YOLO11n-pose', frame)
+
+    # if cv2.waitKey(1) & 0xFF == ord('q'):
+    #     break
 
 cap.release()
 cv2.destroyAllWindows()
