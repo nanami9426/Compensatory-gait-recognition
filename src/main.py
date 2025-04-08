@@ -14,6 +14,7 @@ from utils.window import Window
 from utils.reminder import reminder_bytes
 
 from nets.net import predict
+from conf import window_size
 
 app = FastAPI()
 app.add_middleware(
@@ -28,7 +29,6 @@ streaming = True
 lock = threading.Lock()
 
 detector = YOLO('../models/yolo11n-pose.pt')
-window_size = 24
 
 def process_frame(frame):
     frame = cv2.flip(frame, 1)
@@ -80,8 +80,10 @@ def gen_frames():
             if ready:
                 # 做后继模型的预测
                 # print(window.data.shape)
-                ra = torch.randint(0, 10, (1,))
-                if ra % 2 == 0:
+
+                pred = predict(window.data, "pnet")
+                print(pred)
+                if pred.argmax(-1) == 0:
                     occur = True
                 else:
                     occur = False

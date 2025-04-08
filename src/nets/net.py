@@ -1,9 +1,9 @@
 import torch
 from torch import nn
+from conf import window_size, hidden_size, num_layers
 
-window_size = 24
-hidden_size = 128
-num_layers = 2
+
+device = torch.device("cuda:0")
 
 # InputShape([window_size, 17, 2]) 
 # 批量：1，帧数：window_size，输入维度：17*2
@@ -19,7 +19,7 @@ class Pnet(nn.Module):
         res = self.decoder(state[0][-1])
         return res
 
-pnet = Pnet(window_size, hidden_size, num_layers)
+pnet = Pnet(window_size, hidden_size, num_layers).to(device)
 
 
 def predict(x, net):
