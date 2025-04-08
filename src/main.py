@@ -13,6 +13,8 @@ LOGGER.setLevel(logging.WARNING)
 from utils.window import Window
 from utils.reminder import reminder_bytes
 
+from nets.net import predict
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -40,14 +42,16 @@ def process_frame(frame):
         kp = None
     return res.plot(), kp
 
-def put_text(frame, text, occur):
+def put_text(frame, occur):
     font = cv2.FONT_HERSHEY_SIMPLEX
     position = (10, 30)
     font_scale = 1
     if occur:
-        color = (255, 0, 0)
+        color = (0, 0, 255)
+        text = 'OCCURRING'
     else:
         color = (0, 255, 0)
+        text = 'FINE'
     thickness = 2
     cv2.putText(frame, text, position, font, font_scale, color, thickness, cv2.LINE_AA)
     return frame
@@ -83,7 +87,7 @@ def gen_frames():
                     occur = False
                 window.clear()
 
-            frame = put_text(frame, "TEST WORDS", occur)
+            frame = put_text(frame, occur)
             success, frame = cv2.imencode('.jpg', frame)
             if not success:
                 break
