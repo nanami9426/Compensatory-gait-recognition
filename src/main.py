@@ -25,12 +25,12 @@ app.add_middleware(
 streaming = True
 lock = threading.Lock()
 
-model = YOLO('../models/yolo11n-pose.pt')
+detector = YOLO('../models/yolo11n-pose.pt')
 window_size = 24
 
 def process_frame(frame):
     frame = cv2.flip(frame, 1)
-    res = model(frame)[0]
+    res = detector(frame)[0]
     kp = res.keypoints.xy
     if len(res.boxes.cls) > 1:
         # 如果监测出两个人及以上，取置信度最大的
@@ -40,9 +40,24 @@ def process_frame(frame):
         kp = None
     return res.plot(), kp
 
+def put_text(frame, text, occur):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    position = (10, 30)
+    font_scale = 1
+    if occur:
+        color = (255, 0, 0)
+    else:
+        color = (0, 255, 0)
+    thickness = 2
+    cv2.putText(frame, text, position, font, font_scale, color, thickness, cv2.LINE_AA)
+    return frame
+
 def gen_frames():
+    occur = False # 是否出现代偿行为
     window = Window(torch.device("cuda:0"), window_size, (17, 2))
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    # 手机摄像头
+    # cap = cv2.VideoCapture('http://192.168.137.6:8080/video')
     while True:
         with lock:
             if not streaming:
@@ -60,8 +75,15 @@ def gen_frames():
             ready = window.add(kp)
             if ready:
                 # 做后继模型的预测
-                print(window.data.shape)
+                # print(window.data.shape)
+                ra = torch.randint(0, 10, (1,))
+                if ra % 2 == 0:
+                    occur = True
+                else:
+                    occur = False
                 window.clear()
+
+            frame = put_text(frame, "TEST WORDS", occur)
             success, frame = cv2.imencode('.jpg', frame)
             if not success:
                 break
