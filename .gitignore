@@ -1,12 +1,9 @@
 .ipynb_checkpoints
 __pycache__
 
-models/*
-!models/.gitkeep
+
 
 *.mp4
 *.pt
 *.pth
 
-
-rawdata/*
