@@ -7,3 +7,6 @@ models/*
 *.mp4
 *.pt
 *.pth
+
+
+rawdata/*
