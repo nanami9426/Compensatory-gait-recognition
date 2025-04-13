@@ -14,7 +14,7 @@ class Pnet(nn.Module):
         self.encoder = nn.LSTM(17 * 2, num_hiddens, num_layers=num_layers, bidirectional=False)
         self.decoder = nn.Linear(num_hiddens, 2)
     def forward(self, x):
-        x = x.reshape(self.window_size, -1).unsqueeze(1)
+        # x = x.reshape(self.window_size, -1).unsqueeze(1)
         _, state = self.encoder(x)
         res = self.decoder(state[0][-1])
         return res

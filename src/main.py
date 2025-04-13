@@ -33,7 +33,7 @@ detector = YOLO('../models/yolo11n-pose.pt')
 def process_frame(frame):
     frame = cv2.flip(frame, 1)
     res = detector(frame)[0]
-    kp = res.keypoints.xy
+    kp = res.keypoints.xyn
     if len(res.boxes.cls) > 1:
         # 如果监测出两个人及以上，取置信度最大的
         idx = res.boxes.conf.argmax(-1).item()
@@ -81,8 +81,7 @@ def gen_frames():
                 # 做后继模型的预测
                 # print(window.data.shape)
 
-                pred = predict(window.data, "pnet")
-                print(pred)
+                pred = predict(window.data.reshape(window_size, -1).unsqueeze(1), "pnet")
                 if pred.argmax(-1) == 0:
                     occur = True
                 else:
