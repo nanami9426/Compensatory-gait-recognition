@@ -71,7 +71,7 @@ def main(path):
         os.makedirs('rawdata', exist_ok=True)
         df.to_csv(csv_path)
         num_videos += 1
-    print(f"Processed {num_videos} mp4 files, saved in {path}")
+    print(f"Processed {num_videos} mp4 files, saved in {'./rawdata'}")
 
 
 if __name__ == '__main__':
