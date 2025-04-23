@@ -22,15 +22,3 @@ class Window:
     @property
     def data(self):
         return self._data.clone().detach()
-
-
-if __name__ == '__main__':
-    window = Window('cuda:0', 4, (17, 2))
-    while True:
-        x = torch.randn(1, 17, 2)
-        flag = window.add(x)
-        if flag:
-            break
-    print(window.data[0, 0, :], window.data.shape)
-    window.clear()
-    print(window.data[0, 0, :], window.data.shape)
