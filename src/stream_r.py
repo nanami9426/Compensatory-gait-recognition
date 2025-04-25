@@ -13,7 +13,7 @@ from conf import window_size
 stream_router = APIRouter()
 
 
-streaming = True
+streaming = False
 lock = threading.Lock()
 
 detector = YOLO('../models/yolo11n-pose.pt')
