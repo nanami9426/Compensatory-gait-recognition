@@ -16,5 +16,7 @@ app.add_middleware(
 )
 
 
-from stream_r import stream_router
+from routes.stream_r import stream_router
+from routes.train_r import train_router
 app.include_router(stream_router)
+app.include_router(train_router)

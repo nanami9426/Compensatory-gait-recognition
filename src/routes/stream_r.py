@@ -16,7 +16,7 @@ stream_router = APIRouter()
 streaming = False
 lock = threading.Lock()
 
-detector = YOLO('../models/yolo11n-pose.pt')
+detector = YOLO('../../models/yolo11n-pose.pt')
 
 def process_frame(frame):
     frame = cv2.flip(frame, 1)
