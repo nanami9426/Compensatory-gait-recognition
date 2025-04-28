@@ -1,6 +1,7 @@
 import time
 import torch
 
+
 class Accumulator:
     def __init__(self, n):
         self.data = [0.0] * n
@@ -13,7 +14,7 @@ class Accumulator:
 
     def __getitem__(self, idx):
         return self.data[idx]
-    
+
 
 class Timer:
     def __init__(self):
@@ -42,11 +43,13 @@ class Timer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
-def accuracy(y_hat,y):
-    if len(y_hat[0])>1 and len(y_hat.shape)>1:
+
+def accuracy(y_hat, y):
+    if len(y_hat[0]) > 1 and len(y_hat.shape) > 1:
         y_hat = y_hat.argmax(1)
     cmp = y == y_hat.type(y.dtype)
     return cmp.type(y.dtype).sum().float()
+
 
 def evaluate_accuracy(net, data_iter, device=None):
     if isinstance(net, torch.nn.Module):
@@ -54,12 +57,9 @@ def evaluate_accuracy(net, data_iter, device=None):
         if not device:
             device = next(iter(net.parameters())).device
     metric = Accumulator(2)
-    for X,y in data_iter:
-        if isinstance(X,list):
-            X = [x.to(device) for x in X]
-        else:
-            X = X.to(device)
+    for X, y in data_iter:
+        X = X.permute(1, 0, 2).to(device)
         y = y.to(device)
         pred = net(X)
-        metric.add(accuracy(pred,y),y.numel())
-    return metric[0]/metric[1]
+        metric.add(accuracy(pred, y), y.numel())
+    return metric[0] / metric[1]

@@ -9,14 +9,15 @@ from pydantic import BaseModel
 from nets.net import Pnet
 from conf import window_size, hidden_size, num_layers
 from pathlib import Path
+from datetime import datetime
 
 train_router = APIRouter()
 
-def train(net, train_iter, test_iter=None, num_epochs=16, devices=[torch.device("cuda:0")], save_name="testnet_01.pth"):
+
+def train(net, train_iter, test_iter=None, num_epochs=16, devices=[torch.device("cuda:0")]):
     optimizer = torch.optim.Adam(net.parameters())
     loss = nn.CrossEntropyLoss(reduction='none')
     net = nn.DataParallel(net, device_ids=devices).to(devices[0])
-    # num_batches = len(train_iter)
     timer = metrics.Timer()
     test_acc = None
     for epoch in range(num_epochs):
@@ -35,17 +36,22 @@ def train(net, train_iter, test_iter=None, num_epochs=16, devices=[torch.device(
             timer.stop()
         if test_iter is not None:
             test_acc = metrics.evaluate_accuracy(net, test_iter)
-        yield f'Epoch: {epoch+1}, loss {metric[0] / metric[2]:.3f}, train acc {metric[1] / metric[3]:.3f} \n'
+        yield f'Epoch: {epoch + 1}\n loss {metric[0] / metric[2]:.3f}, train acc {metric[1] / metric[3]:.3f} \n'
         if test_acc is not None:
-            yield f'test acc {test_acc:.3f} \n'
+            yield f' test acc {test_acc:.3f} \n'
     yield f'{metric[2] * num_epochs / timer.t:.1f} examples/sec on {str(devices)} \n'
-    path = os.path.join(Path(__file__).resolve().parents[2], f"models\{save_name}")
-    yield f'net saved at {path} \n'
+
+    now = datetime.now()
+    time_str = now.strftime("%Y_%m_%d_%H_%M_%S")
+    net_path = os.path.join(Path(__file__).resolve().parents[2], f"models\{net.module.name}_{time_str}.pth")
+    torch.save(net.module.state_dict(), net_path)
+    yield f'Net is saved in {net_path} \n'
+
 
 class PoseDataset(torch.utils.data.Dataset):
     def __init__(self, root_dir, window_size):
         self.root_dir = root_dir
-        self.data = [] # (path, label, start_idx)
+        self.data = []  # (path, label, start_idx)
         self.window_size = window_size
         for fname in os.listdir(root_dir):
             if fname.endswith(".csv"):
@@ -55,7 +61,7 @@ class PoseDataset(torch.utils.data.Dataset):
                 total_len = df.shape[0]
                 num_windows = total_len // window_size
                 for i in range(num_windows):
-                    self.data.append((path, label, i*window_size))
+                    self.data.append((path, label, i * window_size))
 
     def __len__(self):
         return len(self.data)
@@ -63,8 +69,9 @@ class PoseDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         path, label, start_idx = self.data[idx]
         df = pd.read_csv(path, header=None).iloc[1:, 1:]
-        segment = df.iloc[start_idx:start_idx+self.window_size].values
+        segment = df.iloc[start_idx:start_idx + self.window_size].values
         return torch.tensor(segment, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+
 
 def get_data_iter(batch_size=32, is_train=True):
     if is_train:
@@ -75,15 +82,18 @@ def get_data_iter(batch_size=32, is_train=True):
     data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=is_train)
     return data_loader
 
+
 def get_net(net_name):
     if net_name == 'pnet':
         return Pnet(window_size, hidden_size, num_layers)
+
 
 class TrainRequest(BaseModel):
     batch_size: int
     evaluate_test: bool
     net_name: str
     num_epochs: int
+
 
 @train_router.post("/func/train")
 def train_api(params: TrainRequest):
@@ -96,7 +106,7 @@ def train_api(params: TrainRequest):
     train_iter = get_data_iter(batch_size, True)
     if evaluate_test:
         test_iter = get_data_iter(batch_size, False)
-    else:    
+    else:
         test_iter = None
     generator = train(net, train_iter, test_iter, num_epochs, devices=[torch.device("cuda:0")])
     return StreamingResponse(generator, media_type='text/plain')

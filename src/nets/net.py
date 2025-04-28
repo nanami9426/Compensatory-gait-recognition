@@ -13,21 +13,15 @@ class Pnet(nn.Module):
         self.window_size = window_size
         self.encoder = nn.LSTM(17 * 2, num_hiddens, num_layers=num_layers, bidirectional=False)
         self.decoder = nn.Linear(num_hiddens, 2)
+        self.name = 'pnet'
     def forward(self, x):
         # x = x.reshape(self.window_size, -1).unsqueeze(1)
         _, state = self.encoder(x)
         res = self.decoder(state[0][-1])
         return res
 
-pnet = Pnet(window_size, hidden_size, num_layers).to(device)
 
 
-def predict(x, net):
-    pred = None
-    if net == "pnet":
-        pred = pnet(x)
 
-    assert pred is not None
-    return pred
 
 

@@ -6,17 +6,28 @@ from ultralytics import YOLO
 import torch
 from utils.window import Window
 from utils.reminder import reminder_bytes
-from nets.net import predict
 from conf import window_size
+from nets.net import Pnet
+from conf import window_size, hidden_size, num_layers
+
+device = torch.device("cuda:0")
+
+pnet = Pnet(window_size, hidden_size, num_layers).to(device)
+
+
+def get_net(net_name):
+    if net_name == 'pnet':
+        return pnet
+    return None
 
 
 stream_router = APIRouter()
-
 
 streaming = False
 lock = threading.Lock()
 
 detector = YOLO('../../models/yolo11n-pose.pt')
+
 
 def process_frame(frame):
     frame = cv2.flip(frame, 1)
@@ -29,6 +40,7 @@ def process_frame(frame):
     elif len(res.boxes.cls) == 0:
         kp = None
     return res.plot(), kp
+
 
 def put_text(frame, occur):
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -44,8 +56,9 @@ def put_text(frame, occur):
     cv2.putText(frame, text, position, font, font_scale, color, thickness, cv2.LINE_AA)
     return frame
 
+
 def gen_frames():
-    occur = False # 是否出现代偿行为
+    occur = False  # 是否出现代偿行为
     window = Window(torch.device("cuda:0"), window_size, (17, 2))
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     # 手机摄像头
@@ -55,12 +68,12 @@ def gen_frames():
             if not streaming:
                 cap.release()
                 break
-        
+
         success, frame = cap.read()
         if not success:
             break
-        
-        frame, kp = process_frame(frame) # kp即关键点，形状[num_people, 17, 2]
+
+        frame, kp = process_frame(frame)  # kp即关键点，形状[num_people, 17, 2]
         if kp is None:
             frame = reminder_bytes
         else:
@@ -68,8 +81,7 @@ def gen_frames():
             if ready:
                 # 做后继模型的预测
                 # print(window.data.shape)
-
-                pred = predict(window.data.reshape(window_size, -1).unsqueeze(1), "pnet")
+                pred = get_net("pnet")(window.data.reshape(window_size, -1).unsqueeze(1))
                 if pred.argmax(-1) == 0:
                     occur = True
                 else:
@@ -84,20 +96,23 @@ def gen_frames():
 
         yield (b"--banana\r\n"
                b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
-        
+
+
 @stream_router.get("/video_feed")
 def video_feed():
     with lock:
         if not streaming:
             return Response(content="Stream is closed", status_code=403)
         return StreamingResponse(gen_frames(), media_type="multipart/x-mixed-replace; boundary=banana")
-    
+
+
 @stream_router.post("/func/start_stream")
 def start_stream():
     global streaming
     with lock:
         streaming = True
     return JSONResponse(content={"status": 1, "content": "stream started"})
+
 
 @stream_router.post("/func/stop_stream")
 def stop_stream():
