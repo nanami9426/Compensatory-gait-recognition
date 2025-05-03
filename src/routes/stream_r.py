@@ -10,8 +10,12 @@ from conf import window_size
 from nets.net import Pnet
 from conf import window_size, hidden_size, num_layers
 
+stream_router = APIRouter()
+streaming = False
+cap_ip = None
 device = torch.device("cuda:0")
-
+lock = threading.Lock()
+detector = YOLO('../../models/yolo11n-pose.pt')
 pnet = Pnet(window_size, hidden_size, num_layers).to(device)
 
 
@@ -21,13 +25,10 @@ def get_net(net_name):
     return None
 
 
-stream_router = APIRouter()
-
-streaming = False
-lock = threading.Lock()
-
-detector = YOLO('../../models/yolo11n-pose.pt')
-
+def get_cap(ip=None):
+    if ip is None:
+        return cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    return cv2.VideoCapture(ip)
 
 def process_frame(frame):
     frame = cv2.flip(frame, 1)
@@ -59,10 +60,8 @@ def put_text(frame, occur):
 
 def gen_frames():
     occur = False  # 是否出现代偿行为
-    window = Window(torch.device("cuda:0"), window_size, (17, 2))
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    # 手机摄像头
-    # cap = cv2.VideoCapture('http://192.168.137.6:8080/video')
+    window = Window(device, window_size, (17, 2))
+    cap = get_cap(cap_ip)
     while True:
         with lock:
             if not streaming:
@@ -120,3 +119,14 @@ def stop_stream():
     with lock:
         streaming = False
     return JSONResponse(content={"status": 1, "content": "stream stopped"})
+
+@stream_router.post("/status")
+def get_status():
+    def get_cap_name():
+        if cap_ip is None:
+            return "默认摄像头"
+        return f"远程摄像头{cap_ip}"
+    return JSONResponse(content={
+        "status": 1, 
+        "cap": get_cap_name()
+    })
