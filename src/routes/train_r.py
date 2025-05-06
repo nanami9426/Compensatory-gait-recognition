@@ -40,7 +40,7 @@ def train(net, train_iter, test_iter=None, num_epochs=16, devices=[torch.device(
             metric.add(l.sum(), train_acc, y.shape[0], y.numel())
             timer.stop()
         if test_iter is not None:
-            test_acc = metrics.evaluate_accuracy(net, test_iter)
+            test_acc = metrics.evaluate_accuracy(net, test_iter,batch_first=batch_first)
         yield f'Epoch: {epoch + 1}\n loss {metric[0] / metric[2]:.3f}, train acc {metric[1] / metric[3]:.3f} \n'
         if test_acc is not None:
             yield f' test acc {test_acc:.3f} \n'
@@ -95,6 +95,7 @@ def get_net(net_name):
         return PoseTextCNN(kernel_sizes,nums_channels), True
     elif net_name == "pose_transformer":
         return LightTransformer(), True
+    return None, None
 
 
 class TrainRequest(BaseModel):

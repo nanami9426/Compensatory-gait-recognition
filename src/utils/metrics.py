@@ -51,14 +51,17 @@ def accuracy(y_hat, y):
     return cmp.type(y.dtype).sum().float()
 
 
-def evaluate_accuracy(net, data_iter, device=None):
+def evaluate_accuracy(net, data_iter, device=None, batch_first=False):
     if isinstance(net, torch.nn.Module):
         net.eval()
         if not device:
             device = next(iter(net.parameters())).device
     metric = Accumulator(2)
     for X, y in data_iter:
-        X = X.permute(1, 0, 2).to(device)
+        if batch_first:
+            X = X.to(device)
+        else:
+            X = X.permute(1, 0, 2).to(device)
         y = y.to(device)
         pred = net(X)
         metric.add(accuracy(pred, y), y.numel())
