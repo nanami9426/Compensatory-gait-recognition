@@ -7,8 +7,8 @@ import torch
 from utils.window import Window
 from utils.reminder import reminder_bytes
 from conf import window_size
-from nets.net import Pnet
-from conf import window_size, hidden_size, num_layers
+from nets.net import PoseNet, PoseTextCNN, LightTransformer
+from conf import window_size, hidden_size, num_layers, kernel_sizes, nums_channels
 
 stream_router = APIRouter()
 streaming = False
@@ -16,13 +16,22 @@ cap_ip = None
 device = torch.device("cuda:0")
 lock = threading.Lock()
 detector = YOLO('../../models/yolo11n-pose.pt')
-pnet = Pnet(window_size, hidden_size, num_layers).to(device)
 
+pose_net = PoseNet(window_size, hidden_size, num_layers).to(device)
+pose_text_cnn = PoseTextCNN(kernel_sizes,nums_channels).to(device)
+pose_transformer = LightTransformer().to(device)
 
 def get_net(net_name):
-    if net_name == 'pnet':
-        return pnet
-    return None
+    '''
+    ret: net, batch_first
+    '''
+    if net_name == 'pose_net':
+        return pose_net, False
+    elif net_name == "pose_text_cnn":
+        return pose_text_cnn, True
+    elif net_name == "pose_transformer":
+        return pose_transformer, True
+    return None, None
 
 
 def get_cap(ip=None):
@@ -58,7 +67,7 @@ def put_text(frame, occur):
     return frame
 
 
-def gen_frames():
+def gen_frames(net, batch_first):
     occur = False  # 是否出现代偿行为
     window = Window(device, window_size, (17, 2))
     cap = get_cap(cap_ip)
@@ -70,6 +79,7 @@ def gen_frames():
 
         success, frame = cap.read()
         if not success:
+            cap.release()
             break
 
         frame, kp = process_frame(frame)  # kp即关键点，形状[num_people, 17, 2]
@@ -80,7 +90,10 @@ def gen_frames():
             if ready:
                 # 做后继模型的预测
                 # print(window.data.shape)
-                pred = get_net("pnet")(window.data.reshape(window_size, -1).unsqueeze(1))
+                if batch_first:
+                    pred = net(window.data.reshape(window_size, -1).unsqueeze(1))
+                else:
+                    pred = net(window.data.reshape(window_size, -1).unsqueeze(0))
                 if pred.argmax(-1) == 0:
                     occur = True
                 else:
@@ -90,6 +103,7 @@ def gen_frames():
             frame = put_text(frame, occur)
             success, frame = cv2.imencode('.jpg', frame)
             if not success:
+                cap.release()
                 break
             frame = frame.tobytes()
 
@@ -99,10 +113,11 @@ def gen_frames():
 
 @stream_router.get("/video_feed")
 def video_feed():
+    net, batch_first = get_net("pose_net")
     with lock:
         if not streaming:
             return Response(content="Stream is closed", status_code=403)
-        return StreamingResponse(gen_frames(), media_type="multipart/x-mixed-replace; boundary=banana")
+        return StreamingResponse(gen_frames(net, batch_first), media_type="multipart/x-mixed-replace; boundary=banana")
 
 
 @stream_router.post("/func/start_stream")

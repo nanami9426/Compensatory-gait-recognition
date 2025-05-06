@@ -9,22 +9,24 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join('..')))
 from src.utils.window import Window
-
 import logging
 from ultralytics.utils import LOGGER
 LOGGER.setLevel(logging.WARNING)
 
-detector = YOLO("../models/yolo11n-pose.pt")
-parser = argparse.ArgumentParser()
 
-parser.add_argument("--window_size", type=int, required=True)
-# path为None则默认处理assets文件夹中所有内容
-parser.add_argument("--path", type=str, required=False)
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--window_size", type=int, required=True)
+    # path为None则默认处理assets文件夹中所有内容
+    parser.add_argument("--path", type=str, required=False)
+    args = parser.parse_args()
+    return args
 
 
-args = parser.parse_args()
+args  =parse_args()
 window_size = args.window_size
 path = args.path if args.path is not None else './assets/'
+detector = YOLO("../models/yolo11n-pose.pt")
 
 
 def gen_df(video_path):

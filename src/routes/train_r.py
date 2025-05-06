@@ -6,15 +6,16 @@ import pandas as pd
 from fastapi import Response, APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from nets.net import Pnet
-from conf import window_size, hidden_size, num_layers
+from nets.net import PoseNet, LightTransformer, PoseTextCNN
+from conf import window_size, hidden_size, num_layers, kernel_sizes, nums_channels
 from pathlib import Path
 from datetime import datetime
 
 train_router = APIRouter()
+device = torch.device("cuda:0")
 
 
-def train(net, train_iter, test_iter=None, num_epochs=16, devices=[torch.device("cuda:0")]):
+def train(net, train_iter, test_iter=None, num_epochs=16, devices=[torch.device("cuda:0")], batch_first=False):
     optimizer = torch.optim.Adam(net.parameters())
     loss = nn.CrossEntropyLoss(reduction='none')
     net = nn.DataParallel(net, device_ids=devices).to(devices[0])
@@ -25,7 +26,11 @@ def train(net, train_iter, test_iter=None, num_epochs=16, devices=[torch.device(
         for i, (X, y) in enumerate(train_iter):
             timer.start()
             net.train()
-            X, y = X.to(devices[0]).permute(1, 0, 2), y.to(devices[0])
+            if batch_first:
+                X = X.to(devices[0])
+            else:
+                X = X.to(devices[0]).permute(1, 0, 2)
+            y = y.to(devices[0])
             optimizer.zero_grad()
             pred = net(X)
             l = loss(pred, y)
@@ -84,8 +89,12 @@ def get_data_iter(batch_size=32, is_train=True):
 
 
 def get_net(net_name):
-    if net_name == 'pnet':
-        return Pnet(window_size, hidden_size, num_layers)
+    if net_name == 'pose_net':
+        return PoseNet(window_size, hidden_size, num_layers), False
+    elif net_name == "pose_text_cnn":
+        return PoseTextCNN(kernel_sizes,nums_channels), True
+    elif net_name == "pose_transformer":
+        return LightTransformer(), True
 
 
 class TrainRequest(BaseModel):
@@ -101,12 +110,12 @@ def train_api(params: TrainRequest):
     evaluate_test = params.evaluate_test
     net_name = params.net_name
     num_epochs = params.num_epochs
-    device = torch.device("cuda:0")
-    net = get_net(net_name).to(device)
+    net, batch_first = get_net(net_name)
+    net.to(device)
     train_iter = get_data_iter(batch_size, True)
     if evaluate_test:
         test_iter = get_data_iter(batch_size, False)
     else:
         test_iter = None
-    generator = train(net, train_iter, test_iter, num_epochs, devices=[torch.device("cuda:0")])
+    generator = train(net, train_iter, test_iter, num_epochs, devices=[torch.device("cuda:0")], batch_first=batch_first)
     return StreamingResponse(generator, media_type='text/plain')
