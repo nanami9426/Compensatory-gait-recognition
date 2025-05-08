@@ -9,7 +9,7 @@ from utils.reminder import reminder_bytes
 from conf import window_size
 from nets.net import PoseNet, PoseTextCNN, LightTransformer
 from conf import window_size, hidden_size, num_layers, kernel_sizes, nums_channels
-
+import os
 stream_router = APIRouter()
 streaming = False
 cap_ip = None
@@ -35,6 +35,9 @@ def get_net(net_name):
 
 
 def get_cap(ip=None):
+    # 展示推流效果用
+    # print(os.listdir("../preprocess/assets"))
+    # return cv2.VideoCapture("../preprocess/assets/58.mp4")
     if ip is None:
         return cv2.VideoCapture(0, cv2.CAP_DSHOW)
     return cv2.VideoCapture(ip)
@@ -91,9 +94,9 @@ def gen_frames(net, batch_first):
                 # 做后继模型的预测
                 # print(window.data.shape)
                 if batch_first:
-                    pred = net(window.data.reshape(window_size, -1).unsqueeze(1))
-                else:
                     pred = net(window.data.reshape(window_size, -1).unsqueeze(0))
+                else:
+                    pred = net(window.data.reshape(window_size, -1).unsqueeze(1))
                 if pred.argmax(-1) == 0:
                     occur = True
                 else:
