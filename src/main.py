@@ -17,8 +17,8 @@ app.add_middleware(
 
 from routes.stream_r import stream_router
 from routes.train_r import train_router
-from routes.upload_r import upload_route
+from routes.video_pic_r import video_pic_route
 
 app.include_router(stream_router)
 app.include_router(train_router)
-app.include_router(upload_route)
+app.include_router(video_pic_route)
