@@ -10,6 +10,8 @@ from conf import window_size
 from nets.net import PoseNet, PoseTextCNN, LightTransformer
 from conf import window_size, hidden_size, num_layers, kernel_sizes, nums_channels
 import os
+import time
+
 stream_router = APIRouter()
 streaming = False
 cap_ip = None
@@ -18,8 +20,9 @@ lock = threading.Lock()
 detector = YOLO('../../models/yolo11n-pose.pt')
 
 pose_net = PoseNet(window_size, hidden_size, num_layers).to(device)
-pose_text_cnn = PoseTextCNN(kernel_sizes,nums_channels).to(device)
+pose_text_cnn = PoseTextCNN(kernel_sizes, nums_channels).to(device)
 pose_transformer = LightTransformer().to(device)
+
 
 def get_net(net_name):
     '''
@@ -37,10 +40,11 @@ def get_net(net_name):
 def get_cap(ip=None):
     # 展示推流效果用
     # print(os.listdir("../preprocess/assets"))
-    # return cv2.VideoCapture("../preprocess/assets/58.mp4")
+    # return cv2.VideoCapture("../preprocess/assets/517.mp4")
     if ip is None:
         return cv2.VideoCapture(0, cv2.CAP_DSHOW)
     return cv2.VideoCapture(ip)
+
 
 def process_frame(frame):
     frame = cv2.flip(frame, 1)
@@ -57,8 +61,8 @@ def process_frame(frame):
 
 def put_text(frame, occur):
     font = cv2.FONT_HERSHEY_SIMPLEX
-    position = (10, 30)
-    font_scale = 1
+    position = (30, 70)
+    font_scale = 3
     if occur:
         color = (0, 0, 255)
         text = 'OCCURRING'
@@ -66,7 +70,8 @@ def put_text(frame, occur):
         color = (0, 255, 0)
         text = 'FINE'
     thickness = 2
-    cv2.putText(frame, text, position, font, font_scale, color, thickness, cv2.LINE_AA)
+    cv2.putText(frame, text, position, font, font_scale,
+                color, thickness, cv2.LINE_AA)
     return frame
 
 
@@ -75,6 +80,7 @@ def gen_frames(net, batch_first):
     window = Window(device, window_size, (17, 2))
     cap = get_cap(cap_ip)
     while True:
+        flag += 1
         with lock:
             if not streaming:
                 cap.release()
@@ -84,7 +90,6 @@ def gen_frames(net, batch_first):
         if not success:
             cap.release()
             break
-
         frame, kp = process_frame(frame)  # kp即关键点，形状[num_people, 17, 2]
         if kp is None:
             frame = reminder_bytes
@@ -94,15 +99,16 @@ def gen_frames(net, batch_first):
                 # 做后继模型的预测
                 # print(window.data.shape)
                 if batch_first:
-                    pred = net(window.data.reshape(window_size, -1).unsqueeze(0))
+                    pred = net(window.data.reshape(
+                        window_size, -1).unsqueeze(0))
                 else:
-                    pred = net(window.data.reshape(window_size, -1).unsqueeze(1))
+                    pred = net(window.data.reshape(
+                        window_size, -1).unsqueeze(1))
                 if pred.argmax(-1) == 0:
                     occur = True
                 else:
                     occur = False
                 window.clear()
-
             frame = put_text(frame, occur)
             success, frame = cv2.imencode('.jpg', frame)
             if not success:
@@ -138,6 +144,7 @@ def stop_stream():
         streaming = False
     return JSONResponse(content={"status": 1, "content": "stream stopped"})
 
+
 @stream_router.post("/status")
 def get_status():
     def get_cap_name():
@@ -145,6 +152,6 @@ def get_status():
             return "默认摄像头"
         return f"远程摄像头{cap_ip}"
     return JSONResponse(content={
-        "status": 1, 
+        "status": 1,
         "cap": get_cap_name()
     })

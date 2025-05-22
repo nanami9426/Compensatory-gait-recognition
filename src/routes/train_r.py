@@ -21,6 +21,7 @@ def train(net, train_iter, test_iter=None, num_epochs=16, devices=[torch.device(
     net = nn.DataParallel(net, device_ids=devices).to(devices[0])
     timer = metrics.Timer()
     test_acc = None
+    test_metrics = None
     for epoch in range(num_epochs):
         metric = metrics.Accumulator(4)
         for i, (X, y) in enumerate(train_iter):
@@ -40,10 +41,11 @@ def train(net, train_iter, test_iter=None, num_epochs=16, devices=[torch.device(
             metric.add(l.sum(), train_acc, y.shape[0], y.numel())
             timer.stop()
         if test_iter is not None:
-            test_acc = metrics.evaluate_accuracy(net, test_iter,batch_first=batch_first)
+            # test_acc = metrics.evaluate_accuracy(net, test_iter,batch_first=batch_first)
+            test_metrics = metrics.evaluate_metrics(net, test_iter,batch_first=batch_first)
         yield f'Epoch: {epoch + 1}\n loss {metric[0] / metric[2]:.3f}, train acc {metric[1] / metric[3]:.3f} \n'
-        if test_acc is not None:
-            yield f' test acc {test_acc:.3f} \n'
+        if test_metrics is not None:
+            yield f' test acc {test_metrics["accuracy"]:.3f}, precision {test_metrics["precision"]:.3f}, recall {test_metrics["recall"]:.3f}, f1 {test_metrics["f1"]:.3f} \n'
     yield f'{metric[2] * num_epochs / timer.t:.1f} examples/sec on {str(devices)} \n'
 
     now = datetime.now()
